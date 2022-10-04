@@ -6,17 +6,16 @@ class Contenedor {
     this._keys = [...keys, "id"];
     this._readFileOrCreateNewOne();
   }
-  
+
   _validateKeysExist(newData) {
-    
     const objectKeys = Object.keys(newData);
     let exists = true;
-    
+
     objectKeys.forEach((key) => {
-      if(!this._keys.includes(key)) {
+      if (!this._keys.includes(key)) {
         exists = false;
       }
-    })
+    });
     return exists;
   }
 
@@ -36,7 +35,9 @@ class Contenedor {
     fs.writeFile(this._filename, "[]", (error) => {
       error
         ? console.log(error)
-        : console.log(`File ${this._filename} was created since it didn't exist in the system`);
+        : console.log(
+            `File ${this._filename} was created since it didn't exist in the system`
+          );
     });
   }
 
@@ -44,9 +45,10 @@ class Contenedor {
     id = Number(id);
     try {
       const data = await this.getData();
-      const parsedData = JSON.parse(data);
-
-      return parsedData.find((producto) => producto.id === id);
+      // const parsedData = JSON.parse(data);
+      // cada vez que llamas a getData, lugo tenes que hacerle un parse, entonces te conviene hacer ese parse desde getData()
+      const found = data.find((producto) => producto.id === id);
+      return found;
     } catch (error) {
       console.log(
         `Error Code: ${error.code} | There was an error when trying to get an element by its ID (${id})`
@@ -58,15 +60,12 @@ class Contenedor {
     try {
       id = Number(id);
       const data = await this.getData();
-      const parsedData = JSON.parse(data);
-      const objectIdToBeRemoved = parsedData.find(
-        (producto) => producto.id === id
-      );
+      const objectIdToBeRemoved = data.find((producto) => producto.id === id);
 
       if (objectIdToBeRemoved) {
-        const index = parsedData.indexOf(objectIdToBeRemoved);
-        parsedData.splice(index, 1);
-        await fs.promises.writeFile(this._filename, JSON.stringify(parsedData));
+        const index = data.indexOf(objectIdToBeRemoved);
+        data.splice(index, 1);
+        await fs.promises.writeFile(this._filename, JSON.stringify(data));
         return true;
       } else {
         console.log(`ID ${id} does not exist in the file`);
@@ -80,71 +79,91 @@ class Contenedor {
   }
 
   async updateById(id, newData) {
-    if(this._validateKeysExist(newData)){
+    if (this._validateKeysExist(newData)) {
       try {
         id = Number(id);
         const data = await this.getData();
-        const parsedData = JSON.parse(data);
-        const objectIdToBeUpdated = parsedData.find(
-          (producto) => producto.id === id
-        );
+        const objectIdToBeUpdated = data.find((producto) => producto.id === id);
         if (objectIdToBeUpdated) {
-          const index = parsedData.indexOf(objectIdToBeUpdated);
-          
-          objectKeys.forEach( (key) => {
-            parsedData[index][key] = newData[key];
-          })
-          
-          
-          await fs.promises.writeFile(this._filename, JSON.stringify(parsedData));
+          // como se  maneja por referencia, trabajamos directamente sobre el objeto que encontramos
+          // entonces, primero obtenemos las keys
+          const objectIdToBeUpdatedKeys= Object.keys(objectIdToBeUpdated)
+          // dsp las recorremos
+          objectIdToBeUpdatedKeys.forEach((key) => {
+            // y preguntamos a cada una de esas keys, si existe dentro del objeto que nostros recibimos
+            // para actualizar, si existe, reemplazamos el valor en esa key, sino no hace nada.
+            if (newData.hasOwnProperty(key)){
+              objectIdToBeUpdated[key]= newData[key]
+            }
+          });
+          // Como se guarda por referencia, directamente escribrimos la info que hay data.
+          await fs.promises.writeFile(this._filename, JSON.stringify(data));
           return true;
         } else {
           console.log(`ID ${id} does not exist in the file`);
           return null;
         }
-  
       } catch (error) {
-        `Error Code: ${error.code} | There was an error when trying to update an element by its ID (${id})`
+        `Error Code: ${error.code} | There was an error when trying to update an element by its ID (${id})`;
       }
     } else {
       return false;
     }
-  
-    
   }
-  
+
   async addToArrayById(id, objectToAdd) {
-    if(this._validateKeysExist(objectToAdd)) {
     try {
-      id = Number(id);
-      const data = await this.getData();
-      const parsedData = JSON.parse(data);
-      const objectIdToBeUpdated = parsedData.find(
-        (producto) => producto.id === id
-      );
-      if (objectIdToBeUpdated) {
-        const index = parsedData.indexOf(objectIdToBeUpdated);
-        
-        const valorActual = parsedData[index][objectKey];
-        
-        const newArray = [...valorActual, objectToAdd[objectKey]];
-        
-        
-        
-        parsedData[index][objectKey] = newArray;
-        
-        await fs.promises.writeFile(this._filename, JSON.stringify(parsedData));
-        return true;
+      if (this._validateKeysExist(objectToAdd)) {
+        id = Number(id);
+        const { products } = objectToAdd;
+        //El producto llega dentro de una propiedad 'products' que utilizas para la validacion
+        const data = await this.getData();
+        // const objectIdToBeUpdated = data.find(
+        //   (producto) => producto.id === id
+        // ); 
+        // Que el producto exista, ya se verifica en el controller, cuando haces el getById()
+        const index = data.findIndex((cart) => cart.id == id);
+        // findIndex retorna -1 si no encuentra
+        if (index >= 0) {
+          // En este caso tenemos que armar el objeto que vamos a agregar, porque recibimos algo asi:
+          /**
+           objectToAdd: {
+              products:{
+                title:...
+                price:...
+                etc...
+                }
+           }
+           */
+          const productToAdd = {
+            title: products.title,
+            price: products.price,
+            description: products.description,
+            code: products.code,
+            image: products.image,
+            stock: products.stock,
+            timestamp: products.timestamp,
+            id: products.id,
+          };
+          data[index].products.push(productToAdd);
+          // Como van por referencia, podemos trabajar directamente sobre el objeto o el array
+          /**
+           entonces como data es nuestro arreglo de carritos, decimos que, queremos pararnos sobre el que esta en la posicion index
+           y sobre ese carrito accedemos a la propiedad products, y como es un arreglo directamente hacemos push() de lo que queremos agregar.
+           */
+          const dataString = JSON.stringify(data);
+          // pasamos a string y guardamos el archivo con la info modificada.
+          fs.writeFileSync(this._filename, dataString);
+          return true;
+        } else {
+          console.log(`ID ${id} does not exist in the file`);
+          return false;
+        }
       } else {
-        console.log(`ID ${id} does not exist in the file`);
         return false;
       }
-
     } catch (error) {
-      `Error Code: ${error.code} | There was an error when trying to update an element by its ID (${id})`
-    }
-    } else {
-      return false;
+      `Error Code: ${error.code} | There was an error when trying to update an element by its ID (${id})`;
     }
   }
 
@@ -152,53 +171,45 @@ class Contenedor {
     try {
       id = Number(id);
       const data = await this.getData();
-      const parsedData = JSON.parse(data);
-      
-      const objectIdToBeUpdated = parsedData.find(
-        (producto) => producto.id === id
-      );
-      
+      const objectIdToBeUpdated = data.find((producto) => producto.id === id);
+
       if (objectIdToBeUpdated) {
-        const index = parsedData.indexOf(objectIdToBeUpdated);
-        
-        const valorActual = parsedData[index][keyName];
+        const index = data.indexOf(objectIdToBeUpdated);
+
+        const valorActual = data[index][keyName];
         let indexToBeRemoved = -1;
         valorActual.forEach((element, indexE) => {
-          if(element.id == objectToRemoveId) {
-            indexToBeRemoved = indexE
+          if (element.id == objectToRemoveId) {
+            indexToBeRemoved = indexE;
           }
-        })
+        });
         const newArray = [...valorActual];
-        
-        if (indexToBeRemoved>-1) {
-          console.log(indexToBeRemoved)
-          newArray.splice(indexToBeRemoved,1)
+
+        if (indexToBeRemoved > -1) {
+          console.log(indexToBeRemoved);
+          newArray.splice(indexToBeRemoved, 1);
         }
-    
-        parsedData[index][keyName] = newArray;
-        await fs.promises.writeFile(this._filename, JSON.stringify(parsedData));
+
+        data[index][keyName] = newArray;
+        await fs.promises.writeFile(this._filename, JSON.stringify(data));
         return true;
       } else {
         console.log(`ID ${id} does not exist in the file`);
         return false;
       }
-
     } catch (error) {
-      `Error Code: ${error.code} | There was an error when trying to update an element by its ID (${id})`
+      `Error Code: ${error.code} | There was an error when trying to update an element by its ID (${id})`;
     }
-  
   }
 
-  async save(object) {    
-    if(this._validateKeysExist(object)) {
+  async save(object) {
+    if (this._validateKeysExist(object)) {
       try {
         const allData = await this.getData();
-        const parsedData = JSON.parse(allData);
-  
-        object.id = parsedData.length + 1;
-        parsedData.push(object);
-  
-        await fs.promises.writeFile(this._filename, JSON.stringify(parsedData));
+        object.id = allData.length + 1;
+        allData.push(object);
+
+        await fs.promises.writeFile(this._filename, JSON.stringify(allData));
         return object.id;
       } catch (error) {
         console.log(
@@ -208,7 +219,6 @@ class Contenedor {
     } else {
       return false;
     }
-    
   }
 
   async deleteAll() {
@@ -223,13 +233,15 @@ class Contenedor {
 
   async getData() {
     const data = await fs.promises.readFile(this._filename, "utf-8");
-    return data;
+    const parsedData = JSON.parse(data);
+    return parsedData;
   }
 
-  async getAll() {
-    const data = await this.getData();
-    return JSON.parse(data);
-  }
+  // este metodo no se utiliza
+  // async getAll() {
+  //   const data = await this.getData();
+  //   return JSON.parse(data);
+  // }
 }
 
 module.exports = Contenedor;
