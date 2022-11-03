@@ -2,8 +2,14 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { ProductoDao } from './dao/ProductoDao.js';
 import { CarritoDao } from './dao/CarritoDao.js'
-import { ProductoCarritoDao } from './dao/ProductoCarritoDao.js';
-import knex from 'knex';
+import connectionDB from './config/db.js';
+
+
+/*
+    te recomiendo quitar todo codigo innecesario en este archivo, para que quede mas legible, como las rutas, si utilizas las que tenes en
+    la carpeta routes, las que tenes aca deberias quitarlas
+*/
+
 
 dotenv.config();
 
@@ -26,7 +32,7 @@ app.use('/api/carrito', routerCart);
 
 const productoDao = new ProductoDao();
 const carritoDao = new CarritoDao();
-const productoCarritoDao = new ProductoCarritoDao();
+const productoCarritoDao = new ProductoDao();
 
 /* ------------------------ Product Endpoints ------------------------ */
 
@@ -111,7 +117,7 @@ routerCart.post('/:id/productos', async(req,res) => {
     const { body } = req;
     
     if (Object.prototype.hasOwnProperty.call(body, 'productId')) {
-        const newProductoCarritoId = await productoCarritoDao.saveProductToCart(id, body.productId);
+        const newProductoCarritoId = await ProductoDao.saveProductToCart(id, body.productId);
         
         newProductoCarritoId 
             ? res.status(200).json({"success": "Product added correctly to the Cart"})
@@ -127,7 +133,7 @@ routerCart.post('/:id/productos', async(req,res) => {
 routerCart.delete('/:id/productos/:id_prod', async(req, res) => {
     const {id, id_prod } = req.params;
     
-    const wasDeleted = productoCarritoDao.deleteProductFromCart(id, id_prod);
+    const wasDeleted = ProductoDao.deleteProductFromCart(id, id_prod);
     
     wasDeleted 
         ? res.status(200).json({"success": "product removed from the cart"})
@@ -138,7 +144,7 @@ routerCart.delete('/:id/productos/:id_prod', async(req, res) => {
 // GET /api/carrito/:id/productos
 routerCart.get('/:id/productos', async(req, res) => {
     const { id } = req.params;
-    const cartProducts = await productoCarritoDao.getAllProductsFromCart(id); 
+    const cartProducts = await ProductoDao.getAllProductsFromCart(id); 
     if (cartProducts.length) {
         res.status(200).json(cartProducts)
     } else {
@@ -147,7 +153,8 @@ routerCart.get('/:id/productos', async(req, res) => {
 })
 
 const PORT = 1234;
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
+    connectionDB.connectionMongo()
 console.log(` >>>>> 🚀 Server started at http://localhost:${PORT}`)
 })
 
